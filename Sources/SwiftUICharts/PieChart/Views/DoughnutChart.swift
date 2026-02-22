@@ -29,17 +29,23 @@ import SwiftUI
  .legends(chartData: data)
  ```
  */
-public struct DoughnutChart<ChartData>: View where ChartData: DoughnutChartData {
-    
+public struct DoughnutChart<ChartData, CenterContent>: View where ChartData: DoughnutChartData, CenterContent: View {
+
     @ObservedObject private var chartData: ChartData
     @State private var timer: Timer?
-    
+    private let centerContent: (PieChartDataPoint?) -> CenterContent
+
     /// Initialises a bar chart view.
     /// - Parameter chartData: Must be DoughnutChartData.
-    public init(chartData: ChartData) {
+    public init(
+        chartData: ChartData,
+        @ViewBuilder centerContent: @escaping (PieChartDataPoint?) -> CenterContent
+    ) {
         self.chartData = chartData
+        self.centerContent = centerContent
     }
-    
+
+
     @State private var startAnimation: Bool = false
     @State private var selected: PieChartDataPoint?
 
@@ -68,21 +74,36 @@ public struct DoughnutChart<ChartData>: View where ChartData: DoughnutChartData 
                     .overlay(dataPoint: chartData.dataSets.dataPoints[data],
                              chartData: chartData,
                              rect: geo.frame(in: .local))
-                    .onTapGesture {
-                        selected = chartData.dataSets.dataPoints[data]
-                    }
                     .scaleEffect(animationValue)
                     .opacity(Double(animationValue))
                     .animation(Animation.spring().delay(Double(data) * 0.06))
                     .if(selected == chartData.dataSets.dataPoints[data]) {
                         $0
-                            .scaleEffect(1.1)
+                            .scaleEffect(1.12)
                             .zIndex(1)
+                    }
+                    .onTapGesture {
+                        withAnimation(.easeInOut) {
+                            if selected == chartData.dataSets.dataPoints[data] {
+                                selected = nil
+                            } else {
+                                selected = chartData.dataSets.dataPoints[data]
+                            }
+                        }
                     }
                     .accessibilityLabel(chartData.metadata.title)
                     .accessibilityValue(chartData.dataSets.dataPoints[data].getCellAccessibilityValue(specifier: chartData.infoView.touchSpecifier,
                                                                                                       formatter: chartData.infoView.touchFormatter))
                 }
+
+                centerContent(selected)
+                    .frame(
+                        width: min(geo.size.width, geo.size.height) - chartData.chartStyle.strokeWidth * 2,
+                        height: min(geo.size.width, geo.size.height) - chartData.chartStyle.strokeWidth * 2
+                    )
+            }
+            .onTapGesture {
+              selected = nil
             }
         }
         .animateOnAppear(disabled: chartData.disableAnimation, using: chartData.chartStyle.globalAnimation) {
@@ -107,10 +128,24 @@ public struct DoughnutChart<ChartData>: View where ChartData: DoughnutChartData 
 struct DoughnutChart_Previews: PreviewProvider {
     static var previews: some View {
         GeometryReader { geo in
-            DoughnutChart(chartData: mockData)
-                .touchOverlay(chartData: mockData)
-                .headerBox(chartData: mockData)
-                .frame(width: geo.size.width)
+            DoughnutChart(chartData: mockData) { selected in
+                VStack {
+                    if let selected {
+                        Text(selected.description ?? "")
+                            .font(.headline)
+                        Text("\(selected.value)")
+                            .font(.subheadline)
+                    } else {
+                        Text("Total")
+                            .font(.headline)
+                        Text("$1,500")
+                            .font(.subheadline)
+                    }
+                }
+                .transition(.opacity)
+                .animation(.easeInOut, value: selected)
+            }
+
         }
         .frame(height: 250)
     }
