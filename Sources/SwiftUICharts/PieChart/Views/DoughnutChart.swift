@@ -41,6 +41,7 @@ public struct DoughnutChart<ChartData>: View where ChartData: DoughnutChartData 
     }
     
     @State private var startAnimation: Bool = false
+    @State private var selected: PieChartDataPoint?
 
     public var body: some View {
         GeometryReader { geo in
@@ -67,14 +68,16 @@ public struct DoughnutChart<ChartData>: View where ChartData: DoughnutChartData 
                     .overlay(dataPoint: chartData.dataSets.dataPoints[data],
                              chartData: chartData,
                              rect: geo.frame(in: .local))
+                    .onTapGesture {
+                        selected = chartData.dataSets.dataPoints[data]
+                    }
                     .scaleEffect(animationValue)
                     .opacity(Double(animationValue))
                     .animation(Animation.spring().delay(Double(data) * 0.06))
-                    .if(chartData.infoView.touchOverlayInfo == [chartData.dataSets.dataPoints[data]]) {
+                    .if(selected == chartData.dataSets.dataPoints[data]) {
                         $0
                             .scaleEffect(1.1)
                             .zIndex(1)
-                            .shadow(color: Color.primary, radius: 10)
                     }
                     .accessibilityLabel(chartData.metadata.title)
                     .accessibilityValue(chartData.dataSets.dataPoints[data].getCellAccessibilityValue(specifier: chartData.infoView.touchSpecifier,
