@@ -41,31 +41,44 @@ public struct DoughnutChart<ChartData>: View where ChartData: DoughnutChartData 
     }
     
     @State private var startAnimation: Bool = false
-    
+
     public var body: some View {
         GeometryReader { geo in
             ZStack {
                 ForEach(chartData.dataSets.dataPoints.indices, id: \.self) { data in
-                    DoughnutSegmentShape(id: chartData.dataSets.dataPoints[data].id,
-                                         startAngle: chartData.dataSets.dataPoints[data].startAngle,
-                                         amount: chartData.dataSets.dataPoints[data].amount)
-                        .stroke(chartData.dataSets.dataPoints[data].colour,
-                                lineWidth: chartData.chartStyle.strokeWidth)
-                        .overlay(dataPoint: chartData.dataSets.dataPoints[data],
-                                 chartData: chartData,
-                                 rect: geo.frame(in: .local))
-                        .scaleEffect(animationValue)
-                        .opacity(Double(animationValue))
-                        .animation(Animation.spring().delay(Double(data) * 0.06))
-                        .if(chartData.infoView.touchOverlayInfo == [chartData.dataSets.dataPoints[data]]) {
-                            $0
-                                .scaleEffect(1.1)
-                                .zIndex(1)
-                                .shadow(color: Color.primary, radius: 10)
-                        }
-                        .accessibilityLabel(chartData.metadata.title)
-                        .accessibilityValue(chartData.dataSets.dataPoints[data].getCellAccessibilityValue(specifier: chartData.infoView.touchSpecifier,
-                                                                                                          formatter: chartData.infoView.touchFormatter))
+                    let radius = min(geo.size.width, geo.size.height) / 2
+                    let strokeWidth = chartData.chartStyle.strokeWidth
+                    // Convert stroke width to radians so gap scales with chart size
+                    let angularGap = Double(strokeWidth / radius) * 1.15  // 👈 tweak 1.5 multiplier
+
+                    DoughnutSegmentShape(
+                        id: chartData.dataSets.dataPoints[data].id,
+                        startAngle: chartData.dataSets.dataPoints[data].startAngle,
+                        amount: chartData.dataSets.dataPoints[data].amount,
+                        angularGap: angularGap
+                    )
+                    .stroke(
+                        chartData.dataSets.dataPoints[data].colour,
+                        style: StrokeStyle(
+                            lineWidth: chartData.chartStyle.strokeWidth,
+                            lineCap: .round
+                        )
+                    )
+                    .overlay(dataPoint: chartData.dataSets.dataPoints[data],
+                             chartData: chartData,
+                             rect: geo.frame(in: .local))
+                    .scaleEffect(animationValue)
+                    .opacity(Double(animationValue))
+                    .animation(Animation.spring().delay(Double(data) * 0.06))
+                    .if(chartData.infoView.touchOverlayInfo == [chartData.dataSets.dataPoints[data]]) {
+                        $0
+                            .scaleEffect(1.1)
+                            .zIndex(1)
+                            .shadow(color: Color.primary, radius: 10)
+                    }
+                    .accessibilityLabel(chartData.metadata.title)
+                    .accessibilityValue(chartData.dataSets.dataPoints[data].getCellAccessibilityValue(specifier: chartData.infoView.touchSpecifier,
+                                                                                                      formatter: chartData.infoView.touchFormatter))
                 }
             }
         }
@@ -86,3 +99,63 @@ public struct DoughnutChart<ChartData>: View where ChartData: DoughnutChartData 
         }
     }
 }
+
+#if DEBUG
+struct DoughnutChart_Previews: PreviewProvider {
+    static var previews: some View {
+        GeometryReader { geo in
+            DoughnutChart(chartData: mockData)
+                .touchOverlay(chartData: mockData)
+                .headerBox(chartData: mockData)
+                .frame(width: geo.size.width)
+        }
+        .frame(height: 250)
+    }
+
+    static var mockData: DoughnutChartData {
+
+        let points = [
+            PieChartDataPoint(
+                value: 800,
+                description: "Food",
+                colour: Color(red: 0.96, green: 0.42, blue: 0.36),
+                label: .none
+            ),
+            PieChartDataPoint(
+                value: 450,
+                description: "Shopping",
+                colour: Color(red: 0.95, green: 0.58, blue: 0.29),
+                label: .none
+            ),
+            PieChartDataPoint(
+                value: 250,
+                description: "Transport",
+                colour: Color(red: 0.95, green: 0.76, blue: 0.30),
+                label: .none
+            )
+        ]
+
+        let dataSet = PieDataSet(
+            dataPoints: points,
+            legendTitle: "Total Spending"
+        )
+
+        let metadata = ChartMetadata(
+            title: "Total Spending",
+            subtitle: "$ 1,500.00"
+        )
+
+        let style = DoughnutChartStyle(
+            infoBoxPlacement: .floating,
+            strokeWidth: 42 // controls thickness
+        )
+
+        return DoughnutChartData(
+            dataSets: dataSet,
+            metadata: metadata,
+            chartStyle: style,
+            noDataText: Text("No data")
+        )
+    }
+}
+#endif
